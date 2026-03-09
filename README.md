@@ -46,7 +46,7 @@ load("@rules_detekt//detekt:toolchains.bzl", "rules_detekt_toolchains")
 rules_detekt_toolchains()
 ```
 
-### bazelrc Configuration
+### `bazelrc` Configuration
 
 Users on Bazel releases prior to 5.1.0 need to enable the JSON Persistent Worker protocol in their `.bazelrc` like so:
 
@@ -80,22 +80,40 @@ $ bazel build //mypackage:my_detekt
 
 Results will be cached on successful runs.
 
-### Advanced Configuration
+## Advanced Configuration
 
-#### Detekt Version
+### Detekt Version
+
+#### `MODULE.bazel` Configuration
 
 Change the `MODULE.bazel` file:
 
 ```python
-detekt = use_extension("//detekt:extensions.bzl", "detekt")
+detekt = use_extension("@rules_detekt//detekt:extensions.bzl", "detekt")
 detekt.detekt_version(
     version = "x.x.x",
     sha256 = "x.x.x.sha256",
 )
+
 use_repo(detekt, "detekt_cli_all")
 ```
 
-Or change the `WORKSPACE` file:
+To download Detekt from a custom location (e.g. an internal mirror), use the `url_templates` parameter:
+
+```python
+detekt = use_extension("@rules_detekt//detekt:extensions.bzl", "detekt")
+detekt.detekt_version(
+    version = "x.x.x",
+    sha256 = "x.x.x.sha256",
+    url_templates = [
+        "https://my-mirror.example.com/detekt/detekt-cli-{version}-all.jar",
+    ],
+)
+
+use_repo(detekt, "detekt_cli_all")
+```
+
+#### `WORKSPACE` Configuration
 
 ```python
 load("@rules_detekt//detekt:versions.bzl", "detekt_version")
@@ -109,7 +127,23 @@ rules_detekt_dependencies(
 )
 ```
 
-#### JVM Flags
+To download Detekt from a custom location (e.g. an internal mirror), use the `url_templates` parameter:
+
+```python
+rules_detekt_dependencies(
+    detekt_version = detekt_version(
+        version = "x.x.x",
+        sha256 = "x.x.x.sha256",
+        url_templates = [
+            "https://my-mirror.example.com/detekt/detekt-cli-{version}-all.jar",
+        ],
+    )
+)
+```
+
+Each template may contain `{version}`, which will be replaced with the version string.
+
+### JVM Flags
 
 Define a toolchain in a `BUILD` file:
 

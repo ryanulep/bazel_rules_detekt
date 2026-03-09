@@ -15,6 +15,7 @@ _version_tag = tag_class(
     attrs = {
         "version": attr.string(mandatory = True),
         "sha256": attr.string(mandatory = True),
+        "url_templates": attr.string_list(),
     },
 )
 
@@ -31,7 +32,11 @@ def _detekt_impl(mctx):
         for override in mod.tags.detekt_version:
             if detekt_version:
                 fail("Only a single detekt_version at once is supported right now!")
-            detekt_version = _detekt_version(version = override.version, sha256 = override.sha256)
+            detekt_version = _detekt_version(
+                version = override.version,
+                sha256 = override.sha256,
+                url_templates = override.url_templates if override.url_templates else None,
+            )
 
     kwargs = dict(detekt = _DEFAULT_DETEKT_RELEASE)
     if detekt_version:
