@@ -23,7 +23,7 @@ _ATTRS = {
     ),
     "deps": attr.label_list(
         default = [],
-        doc = "Dependencies to provide to Detekt for classpath type resolution.",
+        doc = "Dependencies providing user class files and jar files used to construct the classpath for type resolution. Only used when `analysis_mode = 'full'`.",
         providers = [JavaInfo],
     ),
     "plugins": attr.label_list(
@@ -43,19 +43,24 @@ _ATTRS = {
     "baseline": attr.label(
         default = None,
         allow_single_file = [".xml"],
-        doc = "If a baseline xml file is passed in, only new code smells not in the baseline are printed in the console.",
+        doc = "If a baseline xml file is passed in, only new findings not in the baseline are printed.",
     ),
     "all_rules": attr.bool(
         default = False,
         doc = "Activates all available (even unstable) rules.",
     ),
+    "analysis_mode": attr.string(
+        default = "light",
+        values = ["full", "light"],
+        doc = "Analysis mode used by detekt. 'full' analysis mode is comprehensive and enables more advanced analysis with type resolution, but requires the correct compiler options to be provided. The classpath is constructed from `deps` and the appropriate bootclasspath (Android SDK or JDK). 'light' runs a faster, syntax-based analysis only and cannot utilise compiler information; some rules cannot be run in 'light' mode.",
+    ),
     "auto_correct": attr.bool(
         default = False,
-        doc = "Allow rules to auto correct code if they support it. The default rule sets do NOT support auto correcting and won't change any line in the users code base. However custom rules can be written to support auto correcting. The additional 'formatting' rule set, added with `--plugins`, does support it and needs this flag.",
+        doc = "Allow rules to auto correct code if they support it. Custom rules can be written to support auto correcting. The default rule sets do NOT support auto correcting.",
     ),
     "base_path": attr.string(
         default = "",
-        doc = "Specifies a directory as the base path. Currently it impacts all file paths in the formatted reports. File paths in console output and txt report are not affected and remain as absolute paths.",
+        doc = "Specifies a directory as the base path. Currently it impacts all file paths in formatted reports.",
     ),
     "build_upon_default_config": attr.bool(
         default = False,
@@ -65,11 +70,6 @@ _ATTRS = {
         default = False,
         doc = "Disables default rule sets.",
     ),
-    # Consider moving this attribute to the toolchain.
-    "enable_type_resolution": attr.bool(
-        default = False,
-        doc = "Enables type resolution for more advanced static analysis. When enabled, the classpath is constructed from `deps` and the appropriate bootclasspath (Android SDK or JDK) is included. When disabled, no classpath is passed to Detekt and only syntax-based rules are applied.",
-    ),
     "excludes": attr.string_list(
         default = [],
         doc = "Globbing patterns describing paths to exclude from the analysis.",
@@ -78,17 +78,14 @@ _ATTRS = {
         default = [],
         doc = "Globbing patterns describing paths to include in the analysis. Useful in combination with `excludes` patterns.",
     ),
-    "max_issues": attr.int(
-        default = -1,
-        doc = "Passes only when found issues count does not exceed specified issues count.",
+    "fail_on_severity": attr.string(
+        default = "Error",
+        values = ["Error", "Warning", "Info", "Never"],
+        doc = "Specifies the minimum severity that causes the build to fail. Severity levels from highest to lowest: 'Error', 'Warning', 'Info'. Use 'Never' to always pass regardless of findings.",
     ),
     "parallel": attr.bool(
         default = False,
-        doc = "Enables parallel compilation and analysis of source files. Do some benchmarks first before enabling this flag. Heuristics show performance benefits starting from 2,000 lines of Kotlin code.",
-    ),
-    "txt_report": attr.bool(
-        default = False,
-        doc = "Enables / disables the text report generation. The report file name is `{target_name}_detekt_report.txt`.",
+        doc = "Enables concurrent file processing during analysis. Beneficial for codebases over 2,000 lines of Kotlin code.",
     ),
     "html_report": attr.bool(
         default = False,
@@ -181,6 +178,8 @@ def _impl(
     if ctx.attr.all_rules:
         detekt_arguments.add("--all-rules")
 
+    detekt_arguments.add("--analysis-mode", ctx.attr.analysis_mode)
+
     if ctx.attr.auto_correct:
         detekt_arguments.add("--auto-correct")
 
@@ -204,8 +203,7 @@ def _impl(
     if ctx.toolchains[TOOLCHAIN_TYPE].language_version:
         detekt_arguments.add("--language-version", ctx.toolchains[TOOLCHAIN_TYPE].language_version)
 
-    if ctx.attr.max_issues >= 0:
-        detekt_arguments.add("--max-issues", ctx.attr.max_issues)
+    detekt_arguments.add("--fail-on-severity", ctx.attr.fail_on_severity)
 
     if ctx.attr.parallel:
         detekt_arguments.add("--parallel")
@@ -220,7 +218,7 @@ def _impl(
 
     # TODO: We might be able to replace this with a provider check so that we aren't having to manage
     # these bits at the target creation level.
-    if ctx.attr.enable_type_resolution:
+    if ctx.attr.analysis_mode == "full":
         # TODO: This tends to be super slow in larger codebases because it results in huge classpaths.
         # We can look into solving this differently if we need to, or copy what rules_kotlin does
         # with classpath reduction.
@@ -251,9 +249,9 @@ def _impl(
 
         detekt_arguments.add("--classpath", ":".join(filtered_classpath))
 
-    txt_report = ctx.actions.declare_file("{}_detekt_report.txt".format(ctx.label.name))
-    action_outputs.append(txt_report)
-    detekt_arguments.add("--report", "txt:{}".format(txt_report.path))
+    md_report = ctx.actions.declare_file("{}_detekt_report.md".format(ctx.label.name))
+    action_outputs.append(md_report)
+    detekt_arguments.add("--report", "md:{}".format(md_report.path))
 
     if ctx.attr.html_report:
         html_report = ctx.actions.declare_file("{}_detekt_report.html".format(ctx.label.name))
@@ -264,11 +262,6 @@ def _impl(
         xml_report = ctx.actions.declare_file("{}_detekt_report.xml".format(ctx.label.name))
         action_outputs.append(xml_report)
         detekt_arguments.add("--report", "xml:{}".format(xml_report.path))
-
-    if ctx.attr.md_report:
-        md_report = ctx.actions.declare_file("{}_detekt_report.md".format(ctx.label.name))
-        action_outputs.append(md_report)
-        detekt_arguments.add("--report", "md:{}".format(md_report.path))
 
     if ctx.attr.sarif_report:
         sarif_report = ctx.actions.declare_file("{}_detekt_report.sarif".format(ctx.label.name))
@@ -293,10 +286,10 @@ def _impl(
         },
         arguments = [java_arguments, detekt_arguments],
     )
-    run_files.append(txt_report)
+    run_files.append(md_report)
 
     # Note: this is not compatible with Windows, feel free to submit PR!
-    # text report-contents are always printed to shell
+    # md report-contents are always printed to shell
     final_result = ctx.actions.declare_file(ctx.attr.name + ".sh")
     ctx.actions.write(
         output = final_result,
@@ -304,21 +297,21 @@ def _impl(
 #!/bin/bash
 set -euo pipefail
 exit_code=$(cat {execution_result})
-report=$(cat {text_report})
+report=$(cat {md_report})
 if [ ! -z "$report" ]; then
     echo "$report"
 fi
 {baseline_script}
 exit "$exit_code"
-""".format(execution_result = execution_result.short_path, text_report = txt_report.short_path, baseline_script = baseline_script),
+""".format(execution_result = execution_result.short_path, md_report = md_report.short_path, baseline_script = baseline_script),
         is_executable = True,
     )
 
     return [
         DefaultInfo(
-            # The text report is always generated as it's the source for console output via the shell script. However,
+            # The Markdown report is always generated as it's the source for console output via the shell script. However,
             # only add it the report outputs if it's explicitly set.
-            files = depset([f for f in action_outputs if f != txt_report or ctx.attr.txt_report]),
+            files = depset([f for f in action_outputs if f != md_report or ctx.attr.md_report]),
             executable = final_result,
             runfiles = ctx.runfiles(files = run_files),
         ),
