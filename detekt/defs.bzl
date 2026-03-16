@@ -280,6 +280,11 @@ def _impl(
     action_outputs.append(execution_result)
     detekt_arguments.add("--execution-result", "{}".format(execution_result.path))
 
+    stderr_output = ctx.actions.declare_file("{}_stderr.txt".format(ctx.label.name))
+    run_files.append(stderr_output)
+    action_outputs.append(stderr_output)
+    detekt_arguments.add("--stderr-output", "{}".format(stderr_output.path))
+
     ctx.actions.run(
         mnemonic = "Detekt",
         progress_message = "Running Detekt for {}".format(str(ctx.label)),
@@ -304,13 +309,13 @@ def _impl(
 #!/bin/bash
 set -euo pipefail
 exit_code=$(cat {execution_result})
-report=$(cat {text_report})
-if [ ! -z "$report" ]; then
-    echo "$report"
+stderr_content=$(cat {stderr_output})
+if [ ! -z "$stderr_content" ]; then
+    echo "$stderr_content"
 fi
 {baseline_script}
 exit "$exit_code"
-""".format(execution_result = execution_result.short_path, text_report = txt_report.short_path, baseline_script = baseline_script),
+""".format(execution_result = execution_result.short_path, stderr_output = stderr_output.short_path, baseline_script = baseline_script),
         is_executable = True,
     )
 
