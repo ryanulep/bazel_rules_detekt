@@ -55,11 +55,11 @@ _ATTRS = {
     ),
     "base_path": attr.string(
         default = "",
-        doc = "Specifies a directory as the base path. Currently it impacts all file paths in the formatted reports. File paths in console output and txt report are not affected and remain as absolute paths.",
+        doc = "Specifies a directory as the base path. Affects all file paths in formatted reports. File paths in console output and txt report are not affected and remain as absolute paths.",
     ),
     "build_upon_default_config": attr.bool(
         default = False,
-        doc = "Preconfigures detekt with a bunch of rules and some opinionated defaults for you. Allows additional provided configurations to override the defaults.",
+        doc = "Preconfigures detekt with a set of rules and opinionated defaults. Allows additional provided configurations to override the defaults.",
     ),
     "disable_default_rulesets": attr.bool(
         default = False,
@@ -80,7 +80,7 @@ _ATTRS = {
     ),
     "max_issues": attr.int(
         default = -1,
-        doc = "Passes only when found issues count does not exceed specified issues count.",
+        doc = "Passes only when found issues count does not exceed specified issues count. A negative value disables the limit.",
     ),
     "parallel": attr.bool(
         default = False,
@@ -105,10 +105,6 @@ _ATTRS = {
     "sarif_report": attr.bool(
         default = False,
         doc = "Enables / disables the SARIF report generation. The report file name is `{target_name}_detekt_report.sarif`.",
-    ),
-    "is_android": attr.bool(
-        default = False,
-        doc = "Whether the target is an Android target. When `True`, the Android SDK jar is included in the classpath for type resolution.",
     ),
 }
 
@@ -334,24 +330,27 @@ def _detekt_test_impl(ctx):
     return _impl(ctx = ctx, run_as_test_target = True)
 
 detekt = rule(
+    doc = "Runs Detekt static analysis on the given Kotlin and Java sources, failing the build if issues are found.",
     implementation = _detekt_impl,
     attrs = _ATTRS,
     provides = [DefaultInfo],
     toolchains = _TOOLCHAINS,
 )
 
-detekt_create_baseline = rule(
-    implementation = _detekt_create_baseline_impl,
-    attrs = _ATTRS,
-    provides = [DefaultInfo],
-    toolchains = _TOOLCHAINS,
-    executable = True,
-)
-
 detekt_test = rule(
+    doc = "Runs Detekt static analysis as a test target. Unlike `detekt`, violations fail the test but not the build, so `bazel build` succeeds even when issues are present.",
     implementation = _detekt_test_impl,
     attrs = _ATTRS,
     provides = [DefaultInfo],
     toolchains = _TOOLCHAINS,
     test = True,
+)
+
+detekt_create_baseline = rule(
+    doc = "Creates or updates a Detekt baseline file. Run this target to record existing issues so that only new issues fail the build going forward.",
+    implementation = _detekt_create_baseline_impl,
+    attrs = _ATTRS,
+    provides = [DefaultInfo],
+    toolchains = _TOOLCHAINS,
+    executable = True,
 )

@@ -12,6 +12,7 @@ def _impl(ctx):
     return [toolchain]
 
 detekt_toolchain = rule(
+    doc = "Defines a Detekt toolchain, configuring the JVM settings used when running Detekt.",
     implementation = _impl,
     attrs = {
         "jvm_flags": attr.string_list(
@@ -20,12 +21,12 @@ detekt_toolchain = rule(
             allow_empty = False,
         ),
         "language_version": attr.string(
-            doc = "Compatibility mode for Kotlin language version X.Y, reports errors for all language features that came out later.",
+            doc = "Kotlin language version compatibility mode. Detekt reports errors for language features introduced after the specified version.",
             default = "2.0",
             values = ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "2.0", "2.1", "2.2"],
         ),
         "jvm_target": attr.string(
-            doc = "Target version of the generated JVM bytecode that was generated during compilation and is now being used for type resolution.",
+            doc = "Target JVM bytecode version used by Detekt during analysis.",
             default = "1.8",
             values = ["1.8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
         ),

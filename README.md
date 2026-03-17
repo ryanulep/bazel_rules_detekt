@@ -11,7 +11,7 @@ for the [Bazel build system](https://bazel.build).
 - customizable Detekt version and JVM flags;
 - [type resolution](https://detekt.dev/docs/gettingstarted/type-resolution/) with JVM and Android classpath support;
 - baseline generation via `detekt_create_baseline`;
-- configuration options via [attributes](docs/attrs.md).
+- configuration options via [attributes](docs/rules_detekt.md).
 
 ## Compatibility
 
@@ -183,7 +183,7 @@ correspond directly to
 [Detekt CLI flags](https://detekt.dev/docs/1.23.8/gettingstarted/cli/#use-the-cli) and pass them
 through when explicitly set.
 
-More information can be found in the [attributes](docs/attrs.md).
+More information can be found in the [documentation](docs/rules_detekt.md).
 
 ### Reports
 
@@ -230,7 +230,7 @@ load("@rules_detekt//detekt:versions.bzl", "detekt_version")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 
 rules_detekt_dependencies(
-    detekt_version = detekt_version(
+    detekt = detekt_version(
         version = "...",
         sha256 = "...",
     )
@@ -241,7 +241,7 @@ To download Detekt from a custom location (e.g., an internal mirror), use the `u
 
 ```python
 rules_detekt_dependencies(
-    detekt_version = detekt_version(
+    detekt = detekt_version(
         version = "...",
         sha256 = "...",
         url_templates = [
